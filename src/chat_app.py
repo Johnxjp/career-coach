@@ -1,7 +1,10 @@
 from datetime import datetime
+from typing import List, Tuple
 
 import streamlit as st
 from streamlit_extras.bottom_container import bottom
+
+from src.openai_client import get_openai_client
 
 
 def initialize_session_state():
@@ -30,7 +33,7 @@ def display_messages():
     if not st.session_state.messages:
         st.info("👋 Start a conversation by typing a message below!")
         return
-        
+
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.write(message["content"])
@@ -38,36 +41,35 @@ def display_messages():
             st.caption(f"Sent at {message['timestamp']}")
 
 
-def generate_assistant_response(user_message: str) -> str:
-    """Generate a simple assistant response (you can replace this with AI integration later)"""
-    # Simple responses for demonstration
-    responses = {
-        "hello": "Hello! How can I help you today?",
-        "hi": "Hi there! What would you like to chat about?",
-        "how are you": "I'm doing well, thank you for asking! How are you?",
-        "bye": "Goodbye! Have a great day!",
-        "help": "I'm here to help! You can ask me questions or just have a conversation.",
-    }
+def generate_assistant_response(user_message: str, chat_history: List[Tuple[str, str]]) -> str:
+    """Generate an assistant response using OpenAI ChatGPT"""
+    try:
+        # Get OpenAI client
+        openai_client = get_openai_client()
 
-    user_lower = user_message.lower().strip()
+        # Use chat history if available, otherwise empty list
+        messages = [(m["role"], m["content"]) for m in chat_history]
+        messages += [("user", user_message)]
 
-    # Check for exact matches first
-    for key, response in responses.items():
-        if key in user_lower:
-            return response
+        # Get response from OpenAI
+        response = openai_client.get_response_for_chat(messages)
 
-    # Default response
-    return f"That's interesting! You said: '{user_message}'. I'm a simple chatbot, but I'm here to chat with you!"
+        return response
+
+    except Exception as e:
+        # Fallback to simple response if OpenAI fails
+        error_msg = str(e)
+        if "api key" in error_msg.lower() or "OPENAI_API_KEY" in error_msg:
+            return "⚠️ OpenAI API key not configured. Please set your OPENAI_API_KEY environment variable."
+        else:
+            return f"⚠️ Sorry, I encountered an error: {error_msg}. Please try again."
 
 
 def main():
     """Main function to run the Streamlit chat app"""
     # Page configuration
     st.set_page_config(
-        page_title="AI Coach Chat", 
-        page_icon="💬", 
-        layout="wide", 
-        initial_sidebar_state="collapsed"
+        page_title="AI Coach Chat", page_icon="💬", layout="wide", initial_sidebar_state="collapsed"
     )
 
     # Initialize session state
@@ -76,10 +78,10 @@ def main():
     # App header
     st.title("💬 AI Coach Chat")
     st.markdown("Welcome to your personal AI chat assistant!")
-    
+
     # Create a container for chat messages that takes up most of the space
     chat_container = st.container()
-    
+
     with chat_container:
         # Display existing messages
         display_messages()
@@ -106,10 +108,11 @@ def main():
             # Add user message
             add_message("user", user_input)
 
-            # Generate and add assistant response
-            assistant_response = generate_assistant_response(user_input)
+            # Generate and add assistant response with chat history
+            assistant_response = generate_assistant_response(
+                user_input, st.session_state.messages[:-1]
+            )
             add_message("assistant", assistant_response)
-
             # Rerun to update the display
             st.rerun()
 
