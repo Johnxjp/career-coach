@@ -1,11 +1,12 @@
 from datetime import datetime
+import os
 from typing import List, Tuple
 
 import streamlit as st
 from streamlit_extras.bottom_container import bottom
 
-from src.openai_client import get_openai_client
-from src.prompts import intro_message
+from src.openai_client import OpenAIClient, get_openai_client
+from src.prompts import client_message, intro_message, generate_summary_message
 
 
 def add_message(role: str, content: str):
@@ -31,12 +32,6 @@ def initialize_session_state():
         st.session_state.is_active = True
 
 
-def end_conversation():
-    """End the current conversation"""
-    st.session_state.is_active = False
-    st.success("Conversation ended. You can start a new one!")
-
-
 def display_messages():
     """Display all messages in the chat"""
     if not st.session_state.messages:
@@ -50,21 +45,60 @@ def display_messages():
             st.caption(f"Sent at {message['timestamp']}")
 
 
-def generate_assistant_response(user_message: str, chat_history: List[Tuple[str, str]]) -> str:
+def generate_assistant_response(
+    client: OpenAIClient, user_message: str, chat_history: List[Tuple[str, str]]
+) -> str:
     """Generate an assistant response using OpenAI ChatGPT"""
     try:
-        # Get OpenAI client
-        openai_client = get_openai_client()
-
         # Use chat history if available, otherwise empty list
         messages = [(m["role"], m["content"]) for m in chat_history]
-        messages += [("user", user_message)]
+        messages += [("user", client_message.format(client_message=user_message))]
 
         # Get response from OpenAI
-        response = openai_client.get_response_for_chat(messages)
+        response = client.get_response_for_chat(messages)
         # response = "good news"
 
         return response
+
+    except Exception as e:
+        # Fallback to simple response if OpenAI fails
+        error_msg = str(e)
+        if "api key" in error_msg.lower() or "OPENAI_API_KEY" in error_msg:
+            return "⚠️ OpenAI API key not configured. Please set your OPENAI_API_KEY environment variable."
+        else:
+            return f"⚠️ Sorry, I encountered an error: {error_msg}. Please try again."
+
+
+def generate_summary_file(client: OpenAIClient, chat_history: List[dict]) -> str:
+    """
+    Generate a summary file from the chat messages.
+    The content format is markdown. The content should be between <text> and </text> tags.
+    The prompt has been designed to start with <text> so that the model is prompted to immediately start writing the summary.
+    """
+    try:
+        messages = [(m["role"], m["content"]) for m in chat_history]
+        messages += [("user", generate_summary_message)]
+        response = client.get_response_for_chat(messages)
+        summary = response.strip()
+        if "<text>" in summary:
+            summary = summary.split("<text>")[1]
+        if "</text>" in summary:
+            summary = summary.split("</text>")[0]
+
+        summary = summary.strip()
+
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"career_coaching_summary_{timestamp}.md"
+
+        # Create summaries directory if it doesn't exist
+        os.makedirs("summaries", exist_ok=True)
+        filepath = os.path.join("summaries", filename)
+
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(summary)
+
+        return filepath
 
     except Exception as e:
         # Fallback to simple response if OpenAI fails
@@ -81,6 +115,7 @@ def main():
     st.set_page_config(
         page_title="AI Coach Chat", page_icon="💬", layout="wide", initial_sidebar_state="expanded"
     )
+    openai_client = get_openai_client()
 
     # Initialize session state
     initialize_session_state()
@@ -92,10 +127,9 @@ def main():
     with col1:
         st.markdown("A personal coach to help you figure out your career path and next steps!")
     with col2:
-        st.button(
+        end_conversation = st.button(
             "Finish Conversation",
             use_container_width=True,
-            on_click=end_conversation,
         )
 
     # Create a container for chat messages that takes up most of the space
@@ -112,9 +146,10 @@ def main():
                 col1, col2 = st.columns([6, 1])
 
                 with col1:
-                    user_input = st.text_input(
+                    user_input = st.text_area(
                         "Type your message here...",
                         placeholder="Ask me anything!",
+                        height=68,
                         key="user_input",
                         label_visibility="collapsed",
                     )
@@ -131,11 +166,38 @@ def main():
 
             # Generate and add assistant response with chat history
             assistant_response = generate_assistant_response(
-                user_input, st.session_state.messages[:-1]
+                openai_client, user_input, st.session_state.messages[:-1]
             )
             add_message("assistant", assistant_response)
             # Rerun to update the display
             st.rerun()
+
+        if end_conversation:
+            # Generate summary file
+            st.session_state.is_active = False
+            st.success("Conversation ended. You can start a new one by refreshing!")
+            if len(st.session_state.messages) > 2:  # Only show if there's actual conversation
+                with st.spinner("Generating summary..."):
+                    summary_file = generate_summary_file(openai_client, st.session_state.messages)
+
+                    if summary_file:
+                        st.success("Summary generated successfully!")
+
+                        # Read the file content for display and download
+                        with open(summary_file, "r", encoding="utf-8") as f:
+                            summary_content = f.read()
+
+                        # Download button
+                        st.download_button(
+                            label="Download Conversation Summary",
+                            data=summary_content,
+                            file_name=os.path.basename(summary_file),
+                            mime="text/markdown",
+                        )
+
+                st.success(f"Conversation ended. Summary saved to {summary_file}")
+            else:
+                st.info("Have a conversation first.")
 
     # Sidebar with chat controls
     with st.sidebar:

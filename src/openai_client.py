@@ -42,7 +42,7 @@ class OpenAIClient:
     #     """
     #     self.system_message = content
 
-    def get_chat_response(self, messages: List[Dict[str, str]]) -> str:
+    def _get_chat_response(self, messages: List[Dict[str, str]]) -> str:
         """
         Get a chat response from OpenAI
 
@@ -80,7 +80,6 @@ class OpenAIClient:
             List of dictionaries with 'role' and 'content'
         """
         messages = [{"role": role, "content": content} for role, content in messages]
-        messages[-1]["content"] = client_message.format(client_message=messages[-1]["content"])
         return messages
 
     def get_response_for_chat(self, messages: List[Tuple[ROLE, str]]) -> str:
@@ -96,7 +95,7 @@ class OpenAIClient:
 
         # TODO: Manage context length of input messages
         messages = self.format_messages(messages)
-        return self.get_chat_response(messages)
+        return self._get_chat_response(messages)
 
 
 def get_openai_client() -> OpenAIClient:

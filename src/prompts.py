@@ -97,3 +97,22 @@ Hello! I'm an AI professional coach. I can help you navigate career transitionsâ
 
 To kick things off, could you share what brings you here today? We'll go step by step to find clarity and next steps. Looking forward to supporting you!
 """
+
+
+generate_summary_message = """
+Produce a summary document of the conversation with the title 'Career Coaching Session Summary'.
+
+The document must contain the following sections:
+1. Key Insights
+2. Ideas Explored
+3. Action Items / Next Steps
+
+If there are no insights, ideas or action items, leave the section empty.
+Only include content that you have discussed with the client. 
+NEVER include anything not explicitly 
+
+Place the summary in the tags <text>Summary here</text>.
+Use markdown formatting for the summary.
+
+<text>
+"""
