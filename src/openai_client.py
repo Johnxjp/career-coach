@@ -8,6 +8,8 @@ from typing import Dict, List, Literal, Optional, Tuple
 
 from openai import OpenAI
 
+from src.prompts import system_message, client_message
+
 ROLE = Literal["assistant", "user"]
 
 
@@ -29,16 +31,16 @@ class OpenAIClient:
             raise ValueError("OPENAI_API_KEY environment variable is required")
 
         self.client = OpenAI(api_key=self.api_key)
-        self.system_message: Optional[str] = None
+        self.system_message: Optional[str] = system_message
 
-    def set_system_message(self, content: str):
-        """
-        Set a system message to define the assistant's behavior
+    # def set_system_message(self, content: str):
+    #     """
+    #     Set a system message to define the assistant's behavior
 
-        Args:
-            content: The content of the system message
-        """
-        self.system_message = content
+    #     Args:
+    #         content: The content of the system message
+    #     """
+    #     self.system_message = content
 
     def get_chat_response(self, messages: List[Dict[str, str]]) -> str:
         """
@@ -77,7 +79,9 @@ class OpenAIClient:
         Returns:
             List of dictionaries with 'role' and 'content'
         """
-        return [{"role": role, "content": content} for role, content in messages]
+        messages = [{"role": role, "content": content} for role, content in messages]
+        messages[-1]["content"] = client_message.format(client_message=messages[-1]["content"])
+        return messages
 
     def get_response_for_chat(self, messages: List[Tuple[ROLE, str]]) -> str:
         """

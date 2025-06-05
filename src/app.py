@@ -5,7 +5,7 @@ import streamlit as st
 from streamlit_extras.bottom_container import bottom
 
 from src.openai_client import get_openai_client
-
+from src.prompts import intro_message
 
 def initialize_session_state():
     """Initialize session state variables for chat history"""
@@ -13,6 +13,8 @@ def initialize_session_state():
         st.session_state.messages = []
     if "message_counter" not in st.session_state:
         st.session_state.message_counter = 0
+    if "is_active" not in st.session_state:
+        st.session_state.is_active = True
 
 
 def add_message(role: str, content: str):
@@ -26,6 +28,12 @@ def add_message(role: str, content: str):
         }
     )
     st.session_state.message_counter += 1
+
+
+def end_conversation():
+    """End the current conversation"""
+    st.session_state.is_active = False
+    st.success("Conversation ended. You can start a new one!")
 
 
 def display_messages():
@@ -53,6 +61,7 @@ def generate_assistant_response(user_message: str, chat_history: List[Tuple[str,
 
         # Get response from OpenAI
         response = openai_client.get_response_for_chat(messages)
+        # response = "good news"
 
         return response
 
@@ -69,39 +78,49 @@ def main():
     """Main function to run the Streamlit chat app"""
     # Page configuration
     st.set_page_config(
-        page_title="AI Coach Chat", page_icon="💬", layout="wide", initial_sidebar_state="collapsed"
+        page_title="AI Coach Chat", page_icon="💬", layout="wide", initial_sidebar_state="expanded"
     )
 
     # Initialize session state
     initialize_session_state()
 
     # App header
-    st.title("💬 AI Coach Chat")
-    st.markdown("Welcome to your personal AI chat assistant!")
+    st.title("💬 AI Career Coach")
+
+    col1, col2 = st.columns([6, 1])
+    with col1:
+        st.markdown("A personal coach to help you figure out your career path and next steps!")
+    with col2:
+        st.button(
+            "Finish Conversation",
+            use_container_width=True,
+            on_click=end_conversation,
+        )
 
     # Create a container for chat messages that takes up most of the space
     chat_container = st.container()
+    add_message("assistant", intro_message)
 
     with chat_container:
         # Display existing messages
         display_messages()
 
     # Use bottom container for input - this stays at the bottom
-    with bottom():
-        st.markdown("---")
-        with st.form(key="chat_form", clear_on_submit=True):
-            col1, col2 = st.columns([6, 1])
+    if st.session_state.is_active:
+        with bottom():
+            with st.form(key="chat_form", clear_on_submit=True):
+                col1, col2 = st.columns([6, 1])
 
-            with col1:
-                user_input = st.text_input(
-                    "Type your message here...",
-                    placeholder="Ask me anything!",
-                    key="user_input",
-                    label_visibility="collapsed",
-                )
+                with col1:
+                    user_input = st.text_input(
+                        "Type your message here...",
+                        placeholder="Ask me anything!",
+                        key="user_input",
+                        label_visibility="collapsed",
+                    )
 
-            with col2:
-                send_button = st.form_submit_button("Send", use_container_width=True)
+                with col2:
+                    send_button = st.form_submit_button("Send", use_container_width=True)
 
         # Handle message submission
         if send_button and user_input.strip():
