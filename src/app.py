@@ -7,15 +7,6 @@ from streamlit_extras.bottom_container import bottom
 from src.openai_client import get_openai_client
 from src.prompts import intro_message
 
-def initialize_session_state():
-    """Initialize session state variables for chat history"""
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-    if "message_counter" not in st.session_state:
-        st.session_state.message_counter = 0
-    if "is_active" not in st.session_state:
-        st.session_state.is_active = True
-
 
 def add_message(role: str, content: str):
     """Add a new message to the chat history"""
@@ -28,6 +19,16 @@ def add_message(role: str, content: str):
         }
     )
     st.session_state.message_counter += 1
+
+
+def initialize_session_state():
+    """Initialize session state variables for chat history"""
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+        st.session_state.message_counter = 0
+        add_message("assistant", intro_message)
+    if "is_active" not in st.session_state:
+        st.session_state.is_active = True
 
 
 def end_conversation():
@@ -99,7 +100,6 @@ def main():
 
     # Create a container for chat messages that takes up most of the space
     chat_container = st.container()
-    add_message("assistant", intro_message)
 
     with chat_container:
         # Display existing messages
@@ -126,6 +126,8 @@ def main():
         if send_button and user_input.strip():
             # Add user message
             add_message("user", user_input)
+            with st.chat_message("user"):
+                st.write(user_input)
 
             # Generate and add assistant response with chat history
             assistant_response = generate_assistant_response(
